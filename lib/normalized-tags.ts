@@ -1,0 +1,26 @@
+export const NORMALIZED_TAGS = [
+  "Tecnología",
+  "Innovación",
+  "Networking",
+  "Conferencia",
+  "Negocios",
+  "Startups",
+  "Emprendimiento",
+  "Diseño",
+  "UX",
+  "UI",
+  "Workshop",
+  "Creatividad",
+  "Marketing",
+  "Digital",
+  "Estrategia",
+  "Redes Sociales",
+  "Open Source",
+  "Desarrollo",
+  "Comunidad",
+  "IA",
+  "Machine Learning",
+  "Futuro",
+] as const
+
+export type NormalizedTag = (typeof NORMALIZED_TAGS)[number]
