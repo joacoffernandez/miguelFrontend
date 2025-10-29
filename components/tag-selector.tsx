@@ -26,17 +26,18 @@ export function TagSelector({ selectedTags, onTagsChange }: TagSelectorProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  const handleToggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      onTagsChange(selectedTags.filter((t) => t !== tag))
-    } else {
-      onTagsChange([...selectedTags, tag])
-    }
+  const handleSelectTag = (tag: string) => {
+    // Solo permite 1 tag - reemplaza cualquier tag existente
+    onTagsChange([tag])
+    setIsOpen(false) // Cierra el dropdown después de seleccionar
   }
 
-  const handleRemoveTag = (tag: string) => {
-    onTagsChange(selectedTags.filter((t) => t !== tag))
+  const handleRemoveTag = () => {
+    onTagsChange([]) // Limpia todos los tags (solo hay uno)
   }
+
+  // Solo hay un tag seleccionado (o ninguno)
+  const selectedTag = selectedTags.length > 0 ? selectedTags[0] : null
 
   return (
     <div className="space-y-2" ref={dropdownRef}>
@@ -47,7 +48,9 @@ export function TagSelector({ selectedTags, onTagsChange }: TagSelectorProps) {
           className="w-full justify-between h-11 bg-transparent"
           onClick={() => setIsOpen(!isOpen)}
         >
-          <span className="text-gray-500">{selectedTags.length > 0 ? "Tags seleccionados" : "Seleccionar tags"}</span>
+          <span className="text-gray-500">
+            {selectedTag ? `Categoria: ${selectedTag}` : "Seleccionar Categoria"}
+          </span>
           <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
         </Button>
 
@@ -58,9 +61,9 @@ export function TagSelector({ selectedTags, onTagsChange }: TagSelectorProps) {
                 <button
                   key={tag}
                   type="button"
-                  onClick={() => handleToggleTag(tag)}
+                  onClick={() => handleSelectTag(tag)}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                    selectedTags.includes(tag)
+                    selectedTag === tag
                       ? "bg-[#e74c3c]/10 text-[#e74c3c] font-medium"
                       : "hover:bg-gray-100 text-gray-700"
                   }`}
@@ -73,22 +76,25 @@ export function TagSelector({ selectedTags, onTagsChange }: TagSelectorProps) {
         )}
       </div>
 
-      {selectedTags.length > 0 && (
+      {selectedTag && (
         <div className="flex flex-wrap gap-2">
-          {selectedTags.map((tag) => (
-            <Badge key={tag} className="bg-[#e74c3c]/10 text-[#e74c3c] hover:bg-[#e74c3c]/20 px-3 py-1">
-              {tag}
-              <button
-                type="button"
-                onClick={() => handleRemoveTag(tag)}
-                className="ml-2 hover:text-[#c0392b] transition-colors"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </Badge>
-          ))}
+          <Badge className="bg-[#e74c3c]/10 text-[#e74c3c] hover:bg-[#e74c3c]/20 px-3 py-1">
+            {selectedTag}
+            <button
+              type="button"
+              onClick={handleRemoveTag}
+              className="ml-2 hover:text-[#c0392b] transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </Badge>
         </div>
       )}
+
+      {/* Información para el usuario */}
+      <p className="text-xs text-gray-500">
+        Solo puedes seleccionar 1 categoria por evento
+      </p>
     </div>
   )
 }

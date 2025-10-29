@@ -4,7 +4,6 @@ import { Calendar } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 interface Event {
-  id: number
   title: string
   date: string
 }
