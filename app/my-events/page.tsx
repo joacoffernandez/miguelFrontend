@@ -4,33 +4,11 @@ import { useState, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { WeeklyCalendar } from "@/components/weekly-calendar"
-import { Calendar, MapPin, Clock, Download, X, Loader2 } from "lucide-react"
+import { Calendar, MapPin, Clock, Users, Trash2, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { api } from "@/lib/api"
 
-// Interfaces basadas en tus modelos Prisma
-interface TicketDetail {
-  idTicketDetail: string
-  eventID: string
-  ticketID: string
-  firstName: string
-  lastName: string
-  document: number
-  amount: number
-}
-
-interface Ticket {
-  idTicket: string
-  idUser: string
-  idEvent: string
-  amount: number
-  participants: number
-  createdAt: string
-  event: Event
-  detail: TicketDetail[]
-}
-
+// Interface basada en tu modelo Prisma
 interface Event {
   idEvent: string
   title: string
@@ -49,42 +27,41 @@ interface Event {
 
 interface FormattedEvent {
   id: string
-  idEvent: string
   title: string
   date: string
   time: string
   location: string
   category: string
-  isFree: boolean
-  status: "confirmed" | "pending" | "cancelled"
+  price: number
+  attendees: number
+  maxAttendees: number
   image: string
-  originalDate: string // Para el calendario
+  free: boolean
 }
 
-export default function SubscriptionsPage() {
-  const [subscribedEvents, setSubscribedEvents] = useState<FormattedEvent[]>([])
+export default function MyEventsPage() {
+  const [myEvents, setMyEvents] = useState<FormattedEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 🔄 Obtener tickets del usuario
+
   useEffect(() => {
-    const fetchTickets = async () => {
+    const fetchMyEvents = async () => {
       try {
         setLoading(true)
-        const result = await api.get("/getter/tickets/user")
+        const result = await api.get("/getter/myEvents")
         
         if (!result.success) {
-          throw new Error(result.error || "Error al cargar los tickets")
+          throw new Error(result.error || "Error al cargar tus eventos")
         }
 
-        const tickets: Ticket[] = result.data.tickets || []
-        console.log("Tickets obtenidos:", tickets)
+        console.log("Eventos obtenidos:", result.data.events)
+        const eventsData: Event[] = result.data.events || []
 
-        // Transformar tickets a eventos formateados
-        const formattedEvents: FormattedEvent[] = tickets.map(ticket => {
-          const eventDate = new Date(ticket.event.date)
+        const formattedEvents: FormattedEvent[] = eventsData.map(event => {
+          const eventDate = new Date(event.date)
           
-          // Formatear fecha en español
+         
           const formatDate = (date: Date) => {
             const months = [
               "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -93,62 +70,65 @@ export default function SubscriptionsPage() {
             return `${date.getDate()} de ${months[date.getMonth()]}, ${date.getFullYear()}`
           }
 
-          // Formatear hora
+       
           const formatTime = (date: Date) => {
-            return date.toLocaleTimeString("es-ES", {
+            const startTime = date.toLocaleTimeString("es-ES", {
               hour: "2-digit",
               minute: "2-digit"
             })
+          
+            const endTime = new Date(date.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString("es-ES", {
+              hour: "2-digit",
+              minute: "2-digit"
+            })
+            return `${startTime} - ${endTime}`
           }
 
           return {
-            id: ticket.idTicket,
-            idEvent: ticket.idEvent,
-            title: ticket.event.title,
+            id: event.idEvent,
+            title: event.title,
             date: formatDate(eventDate),
-            time: `${formatTime(eventDate)} - ${formatTime(new Date(eventDate.getTime() + 2 * 60 * 60 * 1000))}`, // +2 horas por defecto
-            location: ticket.event.direction,
-            category: "General", // Puedes ajustar esto si tienes categorías en tu modelo
-            isFree: ticket.event.free,
-            status: "confirmed",
-            image: ticket.event.imageURL || "/placeholder-event.jpg",
-            originalDate: ticket.event.date
+            time: formatTime(eventDate),
+            location: event.direction,
+            category: "General", 
+            price: event.price || 0,
+            attendees: event.assistants,
+            maxAttendees: event.assistants + 50, 
+            image: event.imageURL || "/placeholder-event.jpg",
+            free: event.free
           }
         })
 
-        setSubscribedEvents(formattedEvents)
+        setMyEvents(formattedEvents)
       } catch (err) {
-        console.error("Error fetching tickets:", err)
+        console.error("Error fetching my events:", err)
         setError(err instanceof Error ? err.message : "Error desconocido")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchTickets()
+    fetchMyEvents()
   }, [])
 
-  const handleCancelEvent = async (eventId: string) => {
-    if (confirm("¿Estás seguro de que quieres cancelar esta reserva?")) {
+  const handleDeleteEvent = async (eventId: string) => {
       try {
+     
+        const response = await api.delete(`/event/delete/${eventId}`)
 
-        const response = await api.post(`/event/leave/${eventId}`)
-        
         if (!response.success) {
-          throw new Error(response.error || "Error al cancelar la reserva")
+          throw new Error(response.error || "Error al cancelar el evento")
         }
 
-        setSubscribedEvents(prev => prev.filter((event) => event.id !== eventId))
+        setMyEvents(prev => prev.filter((event) => event.id !== eventId))
         
-        console.log(`Ticket para evento ${eventId} cancelado`)
+        console.log(`Evento ${eventId} cancelado`)
       } catch (err) {
-        console.error("Error canceling ticket:", err)
-        alert("Error al cancelar la reserva")
+        console.error("Error deleting event:", err)
       }
-    }
   }
 
-  // ⏳ Estado de carga
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100">
@@ -160,7 +140,7 @@ export default function SubscriptionsPage() {
             <div className="flex justify-center items-center py-16">
               <div className="text-center">
                 <Loader2 className="w-8 h-8 animate-spin text-[#e74c3c] mx-auto" />
-                <p className="mt-4 text-gray-600">Cargando tus tickets...</p>
+                <p className="mt-4 text-gray-600">Cargando tus eventos...</p>
               </div>
             </div>
           </div>
@@ -203,37 +183,31 @@ export default function SubscriptionsPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Mis Tickets</h1>
-              <p className="text-gray-600 mt-2">Eventos a los que vas a asistir</p>
+              <h1 className="text-3xl font-bold text-gray-900">Mis Eventos</h1>
+              <p className="text-gray-600 mt-2">Eventos que has creado</p>
             </div>
             <Badge className="bg-[#e74c3c] hover:bg-[#c0392b] text-lg px-4 py-2">
-              {subscribedEvents.length} eventos
+              {myEvents.length} eventos
             </Badge>
           </div>
 
-          {/* Calendario Semanal - Pasa las fechas originales para el calendario */}
-          <WeeklyCalendar events={subscribedEvents.map(event => ({
-            title: event.title,
-            date: event.originalDate
-          }))} />
-
-          {subscribedEvents.length === 0 ? (
+          {myEvents.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg mb-4">No tienes eventos reservados</p>
+              <p className="text-gray-500 text-lg mb-4">No has creado ningún evento</p>
               <Button className="bg-[#e74c3c] hover:bg-[#c0392b] text-white" asChild>
-                <Link href="/events">Explorar Eventos</Link>
+                <Link href="/events/create">Crear Evento</Link>
               </Button>
             </div>
           ) : (
             <div className="space-y-6">
-              {subscribedEvents.map((event) => (
+              {myEvents.map((event) => (
                 <div
                   key={event.id}
                   className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   <div className="flex flex-col md:flex-row">
-
+                    {/* Event Image */}
                     <div className="md:w-64 h-48 md:h-auto">
                       <img
                         src={event.image 
@@ -251,10 +225,11 @@ export default function SubscriptionsPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <Badge variant="outline">{event.category}</Badge>
-                            <Badge className="bg-green-500 hover:bg-green-600">
-                              {event.status === "confirmed" ? "Confirmado" : "Pendiente"}
-                            </Badge>
-                            {event.isFree && <Badge className="bg-blue-500 hover:bg-blue-600">Gratuito</Badge>}
+                            {event.free ? (
+                              <Badge className="bg-green-500 hover:bg-green-600">Gratis</Badge>
+                            ) : (
+                              <Badge className="bg-[#e74c3c] hover:bg-[#c0392b]">€{event.price}</Badge>
+                            )}
                           </div>
                           <h2 className="text-2xl font-bold text-gray-900 mb-2">{event.title}</h2>
                         </div>
@@ -273,35 +248,33 @@ export default function SubscriptionsPage() {
                           <MapPin className="w-4 h-4" />
                           <span>{event.location}</span>
                         </div>
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Users className="w-4 h-4" />
+                          <span>
+                            {event.attendees} / {event.maxAttendees} inscritos
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex flex-wrap gap-3">
-                        <Button variant="outline" size="sm" asChild onClick={(e) => e.stopPropagation()}>
-                          <Link href={`/subscriptions/${event.id}/details`}>Ver Detalles de la Inscripción</Link>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/my-events/${event.id}/attendees`}>
+                            <Users className="w-4 h-4 mr-2" />
+                            Ver Inscritos
+                          </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/event/${event.id}`}>Ver Detalles</Link>
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex items-center gap-2 bg-transparent"
-                          onClick={(e) => e.stopPropagation()}
-                        >      
-                          <Link href={`/event/${event.idEvent}`}>Ver detalles del evento</Link>
+                          className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 hover:cursor-pointer bg-transparent"
+                          onClick={() => handleDeleteEvent(event.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Cancelar Evento
                         </Button>
-                        {event.isFree && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              e.preventDefault()
-                              handleCancelEvent(event.id)
-                            }}
-                          >
-                            <X className="w-4 h-4" />
-                            Cancelar Reserva
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>

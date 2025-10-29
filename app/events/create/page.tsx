@@ -8,11 +8,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, MapPin, DollarSign, FileText } from "lucide-react"
+import { Calendar, MapPin, DollarSign, FileText, Image as ImageIcon } from "lucide-react"
 import { TagSelector } from "@/components/tag-selector"
+import { api } from "@/lib/api"
+import Image from "next/image"
 
 export default function CreateEventPage() {
   const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [image, setImage] = useState<File | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     title: "",
     date: "",
@@ -21,15 +28,8 @@ export default function CreateEventPage() {
     shortDescription: "",
     location: "",
     price: "",
-    category: "",
-    tags: [] as string[], // Changed to array for multiple tags
+    tags: [] as string[],
   })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("Creating event:", formData)
-    router.push("/events")
-  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -43,6 +43,52 @@ export default function CreateEventPage() {
       ...formData,
       tags,
     })
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImage(file)
+      setPreview(URL.createObjectURL(file))
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      const form = new FormData()
+      form.append("title", formData.title)
+      form.append("description", formData.description)
+      form.append("shortDescription", formData.shortDescription)
+      form.append("direction", formData.location)
+      form.append("date", `${formData.date}T${formData.time}`)
+      form.append("price", formData.price)
+      form.append("free", (parseFloat(formData.price) === 0).toString())
+      form.append("category", formData.tags[0])
+      if (image) form.append("image", image)
+
+      const res = await fetch(`http://localhost:8080/event/create`, {
+            method: "POST",
+            credentials: "include",
+            body: form,
+          })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || "Error al crear el evento")
+      }
+
+      setError(null)
+
+      router.push("/events")
+    } catch (err: any) {
+      console.error("Error fetching event:", err)
+      setError(err instanceof Error ? err.message : "Error desconocido")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -59,6 +105,28 @@ export default function CreateEventPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Imagen */}
+            <div className="space-y-2">
+              <Label htmlFor="image" className="text-gray-700">
+                Imagen del Evento
+              </Label>
+              <div className="relative flex items-center gap-4">
+                <Input id="image" type="file" accept="image/*" onChange={handleImageChange} />
+                <ImageIcon className="text-gray-400 w-5 h-5" />
+              </div>
+              {preview && (
+                <div className="mt-3">
+                  <Image
+                    src={preview}
+                    alt="Vista previa del evento"
+                    width={400}
+                    height={250}
+                    className="rounded-lg border object-cover"
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="title" className="text-gray-700">
                 Título del Evento
@@ -148,27 +216,9 @@ export default function CreateEventPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category" className="text-gray-700">
-                Categoría
-              </Label>
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <Input
-                  id="category"
-                  type="text"
-                  placeholder="Ej: Tecnología, Negocios, Diseño"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="pl-10 h-11"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
               <Label className="text-gray-700">Tags</Label>
               <TagSelector selectedTags={formData.tags} onTagsChange={handleTagsChange} />
-              <p className="text-sm text-gray-500">Los tags ayudan a filtrar y encontrar tu evento</p>
+              <p className="text-sm text-gray-500">Las categorias ayudan a filtrar y encontrar tu evento</p>
             </div>
 
             <div className="space-y-2">
@@ -191,6 +241,12 @@ export default function CreateEventPage() {
               </div>
             </div>
 
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
             <div className="flex gap-4 pt-6">
               <Button
                 type="button"
@@ -200,8 +256,8 @@ export default function CreateEventPage() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="flex-1 bg-[#e74c3c] hover:bg-[#c0392b] text-white">
-                Crear Evento
+              <Button type="submit" disabled={loading} className="flex-1 bg-[#e74c3c] hover:bg-[#c0392b] text-white">
+                {loading ? "Creando..." : "Crear Evento"}
               </Button>
             </div>
           </form>
